@@ -33,7 +33,64 @@ int tokenize(char *line, char **tokens) {
 }
 
 void redirect(char **cmd, bool input) {
-
+  int fd;
+  pid_t pid;
+  char **left = (char **) malloc(MAX_LINE * sizeof(char *));
+  char **right = (char **) malloc(MAX_LINE * sizeof(char *));
+  int i = 0;
+  int j = 0;
+  while (cmd[i] != NULL) {
+    left[i] = NULL;
+    right[i] = NULL;
+    i++;
+  }
+  i = 0;
+  int pfound = 0;
+  while (cmd[i] != NULL) {
+    if (strcmp(cmd[i], "<") == 0) {
+      pfound = 1;
+      j = 0;
+      i++;
+      continue;
+    }
+    if (pfound) {
+      right[j] = cmd[i];
+    } else {
+      left[j] = cmd[i];
+    }
+    i++;
+    j++;
+  }
+  pid = fork();
+  if (pid < 0) {
+    perror("Error during fork");
+    exit(EXIT_FAILURE);
+  }
+  if (pid == 0) {
+    if (input) {
+      fd = freopen(right[0], O_RDWR | O_CREAT, 0777);
+      if (fd == -1) {
+        perror("open");
+        return;
+      }
+      dup2(fd, STDIN_FILENO);
+      close(fd);
+    } else {
+      fd = freopen(right[0], "w+", stdout);
+      if (fd == -1) {
+        perror("open");
+        return;
+      }
+      dup2(fd, STDOUT_FILENO);
+      close(fd);
+    }
+    if (execvp(*cmd, cmd) < 0)
+      perror("Could not execute command");
+    exit(EXIT_SUCCESS);
+  } else {
+    int status;
+    waitpid(pid, &status, 0);
+  }
 }
 
 void pipedCmd(char **cmd) {
@@ -149,8 +206,8 @@ int main() {
     int num_of_tokens = tokenize(cmdLine, args);
     int i = 0;
     int j = 0;
-    for (int i = 0; i <= num_of_tokens; ++i)
-      currCmd[i] = NULL;
+    for (int k = 0; k <= num_of_tokens; ++k)
+      currCmd[k] = NULL;
     while (args[i] != NULL) {
       currCmd[j] = args[i];
       if (strcmp(args[i], "|") == 0) {
@@ -159,7 +216,11 @@ int main() {
       }
       if (strcmp(args[i], "<") == 0 || strcmp(args[i], ">") == 0) {
         redirect(args, true);
-        continue;
+        break;
+      }
+      if (strcmp(args[i], ">") == 0) {
+        redirect(args, false);
+        break;
       }
       if (strcmp(args[i], "&") == 0) {
         currCmd[j] = NULL;
