@@ -32,60 +32,31 @@ int tokenize(char *line, char **tokens) {
   return num;
 }
 
-void runCmd(char *cmdLine) {
-  enum { READ, WRITE };
-  char *args[MAX_LINE / 2 + 1];/* command line arguments */
-  int should_wait = 1;
-  pid_t pid;
-  int status;
-  int pipeFD[2];
-  //create pipe
-  if (pipe(pipeFD) < 0) {
-    perror("Error in creating pipe");
+void runCmd(char **cmd, bool should_wait) {
+  pid_t pid = fork();
+  if (pid < 0) {
+    perror("Error during fork");
     exit(EXIT_FAILURE);
   }
-  for (int i = 0; i < MAX_LINE / 2 + 1; ++i)
-    args[i] = NULL;
-  int num_of_tokens = tokenize(cmdLine, args);
-  // up to first ";" or "&"
-  int i = 0;
-  while (args[i] != NULL) {
-    char **currCmd = (char **) malloc(MAX_LINE * sizeof(char *));
-    for (int i = 0; i <= num_of_tokens; ++i)
-      currCmd[i] = NULL;
-    while (args[i] != NULL && strcmp(args[i], ";") != 0) {
-      if (strcmp(args[i], "&") == 0) {
-        should_wait = 0;
-        break;
-      }
-      currCmd[i] = args[i];
-      i++;
-    }
-    pid = fork();
-    if (pid < 0) {
-      perror("Error during fork");
-      exit(EXIT_FAILURE);
-    }
-    if (pid == 0) {
-      if (execvp(*currCmd, currCmd) < 0)
-        printf("Could not execute command");
-      exit(EXIT_SUCCESS);
-    } else {
-      if (should_wait) {
-        waitpid(-1, &status, 0);
-        should_wait = 0;
-      } else {
-        fflush(stdout);
-      }
-
-    }
-    i++;
+  if (pid == 0) {
+    //sleep(2);
+    if (execvp(*cmd, cmd) < 0)
+      printf("Could not execute command");
+    exit(EXIT_SUCCESS);
+  }
+  if (should_wait) {
+    int status;
+    int completed_pid = wait(&status);
   }
 }
 
 int main() {
   int should_run = 1; /* flag to determine when to exit program */
+  char *args[MAX_LINE / 2 + 1];/* command line arguments */
   char *cmdLine = (char *) malloc(MAX_LINE * sizeof(char));
+  for (int i = 0; i < MAX_LINE / 2 + 1; ++i)
+    args[i] = NULL;
+  char **currCmd = (char **) malloc(MAX_LINE * sizeof(char *));
   while (should_run) {
     printf("osh> ");
     fflush(stdout);
@@ -96,13 +67,41 @@ int main() {
       continue;
     if (strcmp(cmdLine, "exit") == 0)
       break;
-    runCmd(cmdLine);
-    /**
-    * After reading user input, the steps are:
-    * (1) fork a child process using fork()
-    * (2) the child process will invoke execvp()
-    * (3) parent will invoke wait() unless command included &
-    */
+    int num_of_tokens = tokenize(cmdLine, args);
+    int i = 0;
+    int j = 0;
+    for (int i = 0; i <= num_of_tokens; ++i)
+      currCmd[i] = NULL;
+    while (args[i] != NULL) {
+      currCmd[j] = args[i];
+      if (strcmp(args[i], "&") == 0) {
+        currCmd[j] = NULL;
+        runCmd(currCmd, false);
+        j = 0;
+        i++;
+        currCmd = (char **) malloc(MAX_LINE * sizeof(char *));
+        for (int i = 0; i <= num_of_tokens; ++i)
+          currCmd[i] = NULL;
+        continue;
+      }
+      if (strcmp(args[i], ";") == 0) {
+        currCmd[j] = NULL;
+        runCmd(currCmd, true);
+        j = 0;
+        i++;
+        currCmd = (char **) malloc(MAX_LINE * sizeof(char *));
+        for (int i = 0; i <= num_of_tokens; ++i)
+          currCmd[i] = NULL;
+        continue;
+      }
+      if (args[i + 1] == NULL) {
+        runCmd(currCmd, true);
+      }
+      i++;
+      j++;
+    }
+    for (int i = 0; i <= num_of_tokens; ++i)
+      args[i] = NULL;
   }
   printf("Exiting shell\n");
   return 0;
