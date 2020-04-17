@@ -32,6 +32,83 @@ int tokenize(char *line, char **tokens) {
   return num;
 }
 
+void redirect(char **cmd, bool input) {
+
+}
+
+void pipedCmd(char **cmd) {
+  // 0 is read end, 1 is write end
+  enum { READ, WRITE };
+  int pipeFD[2];
+  pid_t p1, p2;
+  char **left = (char **) malloc(MAX_LINE * sizeof(char *));
+  char **right = (char **) malloc(MAX_LINE * sizeof(char *));
+  int i = 0;
+  int j = 0;
+  while (cmd[i] != NULL) {
+    left[i] = NULL;
+    right[i] = NULL;
+    i++;
+  }
+  i = 0;
+  int pfound = 0;
+  while (cmd[i] != NULL) {
+    if (strcmp(cmd[i], "|") == 0) {
+      pfound = 1;
+      j = 0;
+      i++;
+      continue;
+    }
+    if (pfound) {
+      right[j] = cmd[i];
+    } else {
+      left[j] = cmd[i];
+    }
+    i++;
+    j++;
+  }
+  if (pipe(pipeFD) < 0) {
+    printf("\nError in creating pipe");
+    return;
+  }
+  p1 = fork();
+  if (p1 < 0) {
+    printf("\nError during fork");
+    exit(EXIT_FAILURE);
+  }
+  if (p1 == 0) {
+    close(pipeFD[0]);
+    dup2(pipeFD[1], STDOUT_FILENO);
+    close(pipeFD[1]);
+    if (execvp(*left, left) < 0) {
+      printf("\nCould not execute command 1..");
+      exit(0);
+    }
+  } else {
+    // Parent executing
+    p2 = fork();
+    if (p2 < 0) {
+      printf("\nError during fork");
+      exit(EXIT_FAILURE);
+    }
+    // Child 2 executing..
+    // It only needs to read at the read end
+    if (p2 == 0) {
+      close(pipeFD[1]);
+      dup2(pipeFD[0], STDIN_FILENO);
+      close(pipeFD[0]);
+      if (execvp(*right, right) < 0) {
+        printf("\nCould not execute command 2..");
+        exit(0);
+      }
+    } else {
+      // parent executing, waiting for two children
+      wait(NULL);
+      wait(NULL);
+    }
+  }
+}
+
 void runCmd(char **cmd, bool should_wait) {
   pid_t pid = fork();
   if (pid < 0) {
@@ -46,18 +123,17 @@ void runCmd(char **cmd, bool should_wait) {
   }
   if (should_wait) {
     int status;
-    int completed_pid = waitpid(pid, &status, 0);
+    waitpid(pid, &status, 0);
   }
 }
 
 int main() {
-  int should_run = 1; /* flag to determine when to exit program */
   char *args[MAX_LINE / 2 + 1];/* command line arguments */
   char *cmdLine = (char *) malloc(MAX_LINE * sizeof(char));
   for (int i = 0; i < MAX_LINE / 2 + 1; ++i)
     args[i] = NULL;
   char **currCmd = (char **) malloc(MAX_LINE * sizeof(char *));
-  while (should_run) {
+  while (1) {
     printf("osh> ");
     fflush(stdout);
     int len = readline(&cmdLine);
@@ -74,6 +150,14 @@ int main() {
       currCmd[i] = NULL;
     while (args[i] != NULL) {
       currCmd[j] = args[i];
+      if (strcmp(args[i], "|") == 0) {
+        pipedCmd(args);
+        continue;
+      }
+      if (strcmp(args[i], "<") == 0 || strcmp(args[i], ">") == 0) {
+        redirect(args, true);
+        continue;
+      }
       if (strcmp(args[i], "&") == 0) {
         currCmd[j] = NULL;
         runCmd(currCmd, false);
