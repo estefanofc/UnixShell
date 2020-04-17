@@ -46,7 +46,7 @@ void runCmd(char **cmd, bool should_wait) {
   }
   if (should_wait) {
     int status;
-    int completed_pid = wait(&status);
+    int completed_pid = waitpid(pid, &status, 0);
   }
 }
 
