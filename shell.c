@@ -78,33 +78,36 @@ void pipedCmd(char **cmd) {
   }
   if (p1 == 0) {
     close(pipeFD[0]);
-    dup2(pipeFD[1], STDOUT_FILENO);
+    dup2(pipeFD[1], 1);
     close(pipeFD[1]);
-    if (execvp(*left, left) < 0) {
-      printf("\nCould not execute command 1..");
-      exit(0);
+    int success = execvp(*left, left);
+    if (success < 0) {
+      perror("\nCould not execute command 1..");
+      exit(EXIT_FAILURE);
     }
   } else {
-    // Parent executing
     p2 = fork();
     if (p2 < 0) {
-      printf("\nError during fork");
+      perror("\nError during fork");
       exit(EXIT_FAILURE);
     }
     // Child 2 executing..
-    // It only needs to read at the read end
     if (p2 == 0) {
       close(pipeFD[1]);
-      dup2(pipeFD[0], STDIN_FILENO);
+      dup2(pipeFD[0], 0);
       close(pipeFD[0]);
-      if (execvp(*right, right) < 0) {
-        printf("\nCould not execute command 2..");
-        exit(0);
+      int success = execvp(*right, right);
+      if (success < 0) {
+        perror("\nCould not execute command 2..");
+        exit(EXIT_FAILURE);
       }
     } else {
       // parent executing, waiting for two children
-      wait(NULL);
-      wait(NULL);
+      close(pipeFD[0]);
+      close(pipeFD[1]);
+      int status1, status2;
+      waitpid(p1, &status1, 0);
+      waitpid(p2, &status2, 0);
     }
   }
 }
@@ -118,7 +121,7 @@ void runCmd(char **cmd, bool should_wait) {
   if (pid == 0) {
     //sleep(2);
     if (execvp(*cmd, cmd) < 0)
-      printf("Could not execute command");
+      perror("Could not execute command");
     exit(EXIT_SUCCESS);
   }
   if (should_wait) {
@@ -152,7 +155,7 @@ int main() {
       currCmd[j] = args[i];
       if (strcmp(args[i], "|") == 0) {
         pipedCmd(args);
-        continue;
+        break;
       }
       if (strcmp(args[i], "<") == 0 || strcmp(args[i], ">") == 0) {
         redirect(args, true);
