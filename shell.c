@@ -76,7 +76,7 @@ void redirect(char **cmd, bool input) {
       dup2(fd, STDIN_FILENO);
       close(fd);
     } else {
-      fd = open(right[0], O_RDWR | O_CREAT, 0644);
+      fd = open(right[0], O_WRONLY| O_CREAT, 0644);
       if (fd == -1) {
         perror("open");
         return;
@@ -84,7 +84,7 @@ void redirect(char **cmd, bool input) {
       dup2(fd, STDOUT_FILENO);
       close(fd);
     }
-    if (execvp(*cmd, cmd) < 0)
+    if (execvp(*left, left) < 0)
       perror("Could not execute command");
     exit(EXIT_SUCCESS);
   } else {
