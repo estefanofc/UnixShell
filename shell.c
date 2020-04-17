@@ -47,7 +47,7 @@ void redirect(char **cmd, bool input) {
   i = 0;
   int pfound = 0;
   while (cmd[i] != NULL) {
-    if (strcmp(cmd[i], "<") == 0) {
+    if (strcmp(cmd[i], "<") == 0 || strcmp(cmd[i], ">") == 0) {
       pfound = 1;
       j = 0;
       i++;
@@ -76,7 +76,7 @@ void redirect(char **cmd, bool input) {
       dup2(fd, STDIN_FILENO);
       close(fd);
     } else {
-      fd = open(right[0], "w+", stdout);
+      fd = open(right[0], O_RDWR | O_CREAT, 0644);
       if (fd == -1) {
         perror("open");
         return;
@@ -214,7 +214,7 @@ int main() {
         pipedCmd(args);
         break;
       }
-      if (strcmp(args[i], "<") == 0 || strcmp(args[i], ">") == 0) {
+      if (strcmp(args[i], "<") == 0) {
         redirect(args, true);
         break;
       }
