@@ -9,7 +9,6 @@
 #include <unistd.h>     // execvp
 #include <sys/wait.h>   // wait
 #define MAX_LINE 80 /* The maximum length command*/
-#define BUF_SIZE 128
 int readline(char **buffer) {
   size_t len;
   int number_of_chars = getline(buffer, &len, stdin);
@@ -76,7 +75,7 @@ void redirect(char **cmd, bool input) {
       dup2(fd, STDIN_FILENO);
       close(fd);
     } else {
-      fd = open(right[0], O_WRONLY| O_CREAT, 0644);
+      fd = open(right[0], O_WRONLY | O_CREAT, 0644);
       if (fd == -1) {
         perror("open");
         return;
@@ -176,7 +175,6 @@ void runCmd(char **cmd, bool should_wait) {
     exit(EXIT_FAILURE);
   }
   if (pid == 0) {
-    //sleep(2);
     if (execvp(*cmd, cmd) < 0)
       perror("Could not execute command");
     exit(EXIT_SUCCESS);
@@ -190,12 +188,14 @@ void runCmd(char **cmd, bool should_wait) {
 int main() {
   char *args[MAX_LINE / 2 + 1];/* command line arguments */
   char *cmdLine = (char *) malloc(MAX_LINE * sizeof(char));
+  char *history = (char *) malloc(MAX_LINE * sizeof(char));
   for (int i = 0; i < MAX_LINE / 2 + 1; ++i)
     args[i] = NULL;
   char **currCmd = (char **) malloc(MAX_LINE * sizeof(char *));
   while (1) {
     printf("osh> ");
     fflush(stdout);
+
     int len = readline(&cmdLine);
     if (len <= 0)
       break;
@@ -203,6 +203,16 @@ int main() {
       continue;
     if (strcmp(cmdLine, "exit") == 0)
       break;
+    if (strcmp(cmdLine, "!!") == 0) {
+      if (strcmp(history, "") == 0) {
+        printf("No commands in history\n");
+        continue;
+      } else {
+        printf("%s\n", history);
+        strcpy(cmdLine, history);
+      }
+    }
+    strcpy(history, cmdLine);
     int num_of_tokens = tokenize(cmdLine, args);
     int i = 0;
     int j = 0;
@@ -227,7 +237,6 @@ int main() {
         runCmd(currCmd, false);
         j = 0;
         i++;
-        currCmd = (char **) malloc(MAX_LINE * sizeof(char *));
         for (int i = 0; i <= num_of_tokens; ++i)
           currCmd[i] = NULL;
         continue;
@@ -237,7 +246,6 @@ int main() {
         runCmd(currCmd, true);
         j = 0;
         i++;
-        currCmd = (char **) malloc(MAX_LINE * sizeof(char *));
         for (int i = 0; i <= num_of_tokens; ++i)
           currCmd[i] = NULL;
         continue;
