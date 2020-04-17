@@ -68,11 +68,15 @@ void runCmd(char *cmdLine) {
   if (pid == 0) {
     if (execvp(*currCmd, currCmd) < 0)
       printf("Could not execute command");
-    //exit(EXIT_SUCCESS);
+    exit(EXIT_SUCCESS);
   } else {
-    if (should_wait)
+    if (should_wait) {
       wait(&status);
-    //exit(EXIT_SUCCESS);
+      return;
+    } else {
+      fflush(stdout);
+      return;
+    }
   }
 }
 
@@ -90,6 +94,7 @@ int main() {
     if (strcmp(cmdLine, "exit") == 0)
       break;
     runCmd(cmdLine);
+    fflush(stdin);
     /**
     * After reading user input, the steps are:
     * (1) fork a child process using fork()
