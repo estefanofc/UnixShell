@@ -68,7 +68,7 @@ void redirect(char **cmd, bool input) {
   }
   if (pid == 0) {
     if (input) {
-      fd = freopen(right[0], O_RDWR | O_CREAT, 0777);
+      fd = open(right[0], O_RDWR | O_CREAT, 0777);
       if (fd == -1) {
         perror("open");
         return;
@@ -76,7 +76,7 @@ void redirect(char **cmd, bool input) {
       dup2(fd, STDIN_FILENO);
       close(fd);
     } else {
-      fd = freopen(right[0], "w+", stdout);
+      fd = open(right[0], "w+", stdout);
       if (fd == -1) {
         perror("open");
         return;
