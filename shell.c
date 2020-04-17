@@ -47,36 +47,39 @@ void runCmd(char *cmdLine) {
   for (int i = 0; i < MAX_LINE / 2 + 1; ++i)
     args[i] = NULL;
   int num_of_tokens = tokenize(cmdLine, args);
-  char **currCmd = (char **) malloc(MAX_LINE * sizeof(char *));
-  for (int i = 0; i <= num_of_tokens; ++i)
-    currCmd[i] = NULL;
   // up to first ";" or "&"
   int i = 0;
-  while (args[i] != NULL && strcmp(args[i], ";") != 0) {
-    if (strcmp(args[i], "&") == 0) {
-      should_wait = 0;
-      break;
+  while (args[i] != NULL) {
+    char **currCmd = (char **) malloc(MAX_LINE * sizeof(char *));
+    for (int i = 0; i <= num_of_tokens; ++i)
+      currCmd[i] = NULL;
+    while (args[i] != NULL && strcmp(args[i], ";") != 0) {
+      if (strcmp(args[i], "&") == 0) {
+        should_wait = 0;
+        break;
+      }
+      currCmd[i] = args[i];
+      i++;
     }
-    currCmd[i] = args[i];
-    i++;
-  }
-  pid = fork();
-  if (pid < 0) {
-    perror("Error during fork");
-    exit(EXIT_FAILURE);
-  }
-  if (pid == 0) {
-    if (execvp(*currCmd, currCmd) < 0)
-      printf("Could not execute command");
-    exit(EXIT_SUCCESS);
-  } else {
-    if (should_wait) {
-      wait(&status);
-      return;
+    pid = fork();
+    if (pid < 0) {
+      perror("Error during fork");
+      exit(EXIT_FAILURE);
+    }
+    if (pid == 0) {
+      if (execvp(*currCmd, currCmd) < 0)
+        printf("Could not execute command");
+      exit(EXIT_SUCCESS);
     } else {
-      fflush(stdout);
-      return;
+      if (should_wait) {
+        waitpid(-1, &status, 0);
+        should_wait = 0;
+      } else {
+        fflush(stdout);
+      }
+
     }
+    i++;
   }
 }
 
@@ -94,7 +97,6 @@ int main() {
     if (strcmp(cmdLine, "exit") == 0)
       break;
     runCmd(cmdLine);
-    fflush(stdin);
     /**
     * After reading user input, the steps are:
     * (1) fork a child process using fork()
